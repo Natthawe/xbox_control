@@ -1,0 +1,40 @@
+xbox_control_parameters:
+  ros__parameters:
+    # ===== Behavior / Scaling =====
+    scale_linear: 0.5                       # ค่าสูงสุดพื้นฐานของ linear.x (คูณกับค่าแกนที่ผ่านเดดโซน)
+    scale_angular: 1.0                      # ค่าสูงสุดพื้นฐานของ angular.z
+    deadzone: 0.08                          # ตัดสัญญาณลอยของแกนสติ๊กในโหนดนี้ (นอกเหนือจาก deadzone ของ joy_node)
+    rt_threshold: 0.5                       # RT ปล่อย ~ +1.0; ถือว่า “กด” เมื่อค่าต่ำกว่า rt_threshold
+    axis_active_threshold: 0.02             # เริ่มส่งค่าเมื่อแกนขยับเกินเท่านี้ (หลัง deadzone)
+    lt_threshold: 0.5                       # เกณฑ์ตัดสินว่าถือว่า "กด LT" (ไม่กด ≈ +1.0; กดยิ่งลดลง)
+    cmd_vel_publish_rate_hz: 20.0           # ความถี่ในการส่ง /cmd_vel ออก (Hz)
+
+    # Invert direction
+    invert_linear: false                    # true = สลับทิศ linear.x (ขึ้น/ลง)
+    invert_angular: false                   # true = สลับทิศ angular.z (ซ้าย/ขวา)
+
+    # ===== Stick/Trigger Index Mapping =====
+    AX_LX: 0                                # Left Stick Horizontal → angular.z
+    AX_RY: 3                                # Right Stick Vertical  → linear.x
+    AX_RT: 4                                # RT axis (deadman)
+    AX_LT: 5                                # LT axis (trigger for buttons)
+
+    # Buttons
+    BTN_A: 0                                # A : ใช้กับ LT+A เพื่อ tray_cmd = -1 (edge) และ ใช้กับ LB+X เพื่อ -linear_trim
+    BTN_B: 1                                # B : ใช้กับ LB+B เพื่อ +angular_trim
+    BTN_X: 3                                # X : ใช้กับ LB+X เพื่อ -angular_trim
+    BTN_Y: 4                                # Y : ใช้กับ LT+A เพื่อ tray_cmd =  1  (edge) และ ใช้กับ LB+Y เพื่อ +linear_trim
+    BTN_LB: 6                               # LB: คีย์ผสมปรับ trim
+
+    # ===== Trim as Gain (ปรับคูณสเกล ) =====
+    # linear_gain  = max(0, scale_linear  + linear_trim)
+    # angular_gain = max(0, scale_angular + angular_trim)
+    trim_step: 0.01                         # กด LB+Y/A/B/X ครั้งละ 0.01
+    trim_linear_min: -1.0                   # จำกัดขอบเขต linear_trim
+    trim_linear_max:  1.0
+    trim_angular_min: -2.0                  # จำกัดขอบเขต angular_trim
+    trim_angular_max:  2.0
+
+    debug_enable: false                     # เปิดโหมดดีบัก
+    debug_publish_rate_hz: 10.0             # ความถี่ publish ข้อมูลดีบัก (Hz)
+    debug_log_throttle_sec: 2.0             # พิมพ์ log ทุกๆ กี่วินาที
