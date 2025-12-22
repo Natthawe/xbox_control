@@ -272,6 +272,9 @@ class XboxControl(Node):
             v = float(linear_gain * rs_v) if v_active else 0.0
             w = float(angular_gain * ls_h) if w_active else 0.0
 
+            if v < 0:
+                w = -w
+
             twist.linear.x = v
             twist.angular.z = w
         else:
