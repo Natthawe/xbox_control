@@ -11,7 +11,7 @@ xbox_control_parameters:
 
     # Invert direction
     invert_linear: false                    # true = สลับทิศ linear.x (ขึ้น/ลง)
-    invert_angular: false                   # true = สลับทิศ angular.z (ซ้าย/ขวา)
+    invert_angular: true                   # true = สลับทิศ angular.z (ซ้าย/ขวา)
 
     # ===== Stick/Trigger Index Mapping =====
     AX_LX: 0                                # Left Stick Horizontal → angular.z

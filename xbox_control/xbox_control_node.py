@@ -5,8 +5,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Int32, Float32MultiArray, Int32MultiArray
-
+from std_msgs.msg import Int32, Int8, Float32MultiArray, Int32MultiArray
 
 def deadzone(v, dz=0.08):
     return 0.0 if abs(v) < dz else math.copysign((abs(v) - dz) / (1.0 - dz), v)
@@ -86,10 +85,16 @@ class XboxControl(Node):
         # Publishers / Subscribers
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.tray_pub = self.create_publisher(Int32, '/tray_cmd', 10)
+        # Publisher Test Mode
+        self.test_mode_pub = self.create_publisher(Int8, '/test_mode', 10)
+        
         self.create_subscription(Joy, '/joy', self.joy_callback, 10)
 
         # เก็บคำสั่งล่าสุดไว้ส่งซ้ำ
         self._last_twist = Twist()
+
+        # สถานะ Test Mode
+        self.is_test_mode = False 
 
         # ตั้ง timer ให้ publish /cmd_vel คงที่
         self.cmd_timer = self.create_timer(1.0 / max(1e-3, self.cmd_vel_pub_hz), self._on_cmd_timer)
@@ -176,7 +181,11 @@ class XboxControl(Node):
 
     # -------- Cmd timer --------
     def _on_cmd_timer(self):
-        # ส่งคำสั่งล่าสุดออกทุก ๆ รอบ แม้ไม่มี joy เข้ามา
+        # *** ถ้าอยู่ในโหมด Test ให้หยุดส่ง cmd_vel ***
+        if self.is_test_mode:
+            return 
+        
+        # ส่งคำสั่งล่าสุดออกทุก ๆ รอบ แม้ไม่มี joy เข้ามา (Normal Mode)
         self.cmd_pub.publish(self._last_twist)
 
     # -------- Callback --------
@@ -189,42 +198,53 @@ class XboxControl(Node):
         raw_lt = self._axis(msg.axes, self.AX_LT, 1.0)
         lt_pressed = (raw_lt < self.lt_threshold)
 
-        # ===== Tray commands: edge only =====
-        btnY_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_Y)
+        # ===== Button Edges =====
         btnA_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_A)
+        btnB_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_B)
+        btnX_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_X)
+        btnY_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_Y)
 
+        # ===== Tray commands: LT + (Y/A) =====
         if lt_pressed and btnY_edge:
-            self.tray_pub.publish(Int32(data=1))     # LT + Y → เปิด (1)
+            self.tray_pub.publish(Int32(data=1))     # LT + Y → เปิด Tray (1)
 
         if lt_pressed and btnA_edge:
-            self.tray_pub.publish(Int32(data=-1))    # LT + A → ปิด (-1)
+            self.tray_pub.publish(Int32(data=-1))    # LT + A → ปิด Tray (-1)
 
-        # btnY_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_Y)
-        # btnA_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_A)
-        # if btnY_edge:
-        #     self.tray_pub.publish(Int32(data=1))
-        # if btnA_edge:
-        #     self.tray_pub.publish(Int32(data=-1))
+        # ===== TEST MODE Control: LT + (B/X) =====
+        # LT + B = ENABLE Test Mode (1)
+        if lt_pressed and btnB_edge:
+            self.is_test_mode = True
+            self.test_mode_pub.publish(Int8(data=1))
+            self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
+
+        # LT + X = DISABLE Test Mode (0)
+        if lt_pressed and btnX_edge:
+            self.is_test_mode = False
+            self.test_mode_pub.publish(Int8(data=0))
+            self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
+
 
         # ===== Trim adjust: LB + (Y/A/B/X) edge =====
         lb_down = (0 <= self.BTN_LB < len(msg.buttons) and msg.buttons[self.BTN_LB] == 1)
 
-        if lb_down and self._rose(self.prev_buttons, msg.buttons, self.BTN_Y):
-            self.linear_trim = self._clamp(self.linear_trim + self.trim_step,
-                                           self.trim_linear_min, self.trim_linear_max)
-            self.get_logger().info(f'🔧 linear_trim = {self.linear_trim:+.3f}')
-        if lb_down and self._rose(self.prev_buttons, msg.buttons, self.BTN_A):
-            self.linear_trim = self._clamp(self.linear_trim - self.trim_step,
-                                           self.trim_linear_min, self.trim_linear_max)
-            self.get_logger().info(f'🔧 linear_trim = {self.linear_trim:+.3f}')
-        if lb_down and self._rose(self.prev_buttons, msg.buttons, self.BTN_B):
-            self.angular_trim = self._clamp(self.angular_trim + self.trim_step,
-                                            self.trim_angular_min, self.trim_angular_max)
-            self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
-        if lb_down and self._rose(self.prev_buttons, msg.buttons, self.BTN_X):
-            self.angular_trim = self._clamp(self.angular_trim - self.trim_step,
-                                            self.trim_angular_min, self.trim_angular_max)
-            self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
+        if lb_down:
+            if btnY_edge:
+                self.linear_trim = self._clamp(self.linear_trim + self.trim_step,
+                                               self.trim_linear_min, self.trim_linear_max)
+                self.get_logger().info(f'🔧 linear_trim = {self.linear_trim:+.3f}')
+            if btnA_edge:
+                self.linear_trim = self._clamp(self.linear_trim - self.trim_step,
+                                               self.trim_linear_min, self.trim_linear_max)
+                self.get_logger().info(f'🔧 linear_trim = {self.linear_trim:+.3f}')
+            if btnB_edge:
+                self.angular_trim = self._clamp(self.angular_trim + self.trim_step,
+                                                self.trim_angular_min, self.trim_angular_max)
+                self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
+            if btnX_edge:
+                self.angular_trim = self._clamp(self.angular_trim - self.trim_step,
+                                                self.trim_angular_min, self.trim_angular_max)
+                self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
 
         # ===== Driving (RT hold) =====
         raw_lx = self._axis(msg.axes, self.AX_LX, 0.0)
@@ -263,10 +283,7 @@ class XboxControl(Node):
             twist.linear.x = 0.0
             twist.angular.z = 0.0
 
-        # publish cmd
-        # self.cmd_pub.publish(twist)
-
-        # เก็บไว้ให้ timer ส่งออกตามรอบ
+        # เก็บไว้ให้ timer ส่งออกตามรอบ (ถ้าไม่ได้อยู่ใน test mode timer จะเอาค่านี้ไปส่ง)
         self._last_twist = twist
 
         # keep debug state (for timer)
