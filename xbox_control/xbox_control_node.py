@@ -37,7 +37,7 @@ class XboxControl(Node):
         self.declare_parameter('BTN_X', 3)
         self.declare_parameter('BTN_Y', 4)
         self.declare_parameter('BTN_LB', 6)
-        self.declare_parameter('BTN_RB', 7) 
+        self.declare_parameter('BTN_RB', 7)
 
         # Trim (gain mode)
         self.declare_parameter('trim_step', 0.01)
@@ -93,6 +93,9 @@ class XboxControl(Node):
 
         # Publisher Spin Mode
         self.spin_cmd_pub = self.create_publisher(Int8, '/spin_cmd', 10)
+
+        # Publisher Recorder Command
+        self.rec_cmd_pub = self.create_publisher(Int8, '/rec_cmd', 10)
         
         self.create_subscription(Joy, '/joy', self.joy_callback, 10)
 
@@ -100,7 +103,7 @@ class XboxControl(Node):
         self._last_twist = Twist()
 
         # สถานะ Test Mode
-        self.is_test_mode = False 
+        self.is_test_mode = False
 
         # ตั้ง timer ให้ publish /cmd_vel คงที่
         self.cmd_timer = self.create_timer(1.0 / max(1e-3, self.cmd_vel_pub_hz), self._on_cmd_timer)
@@ -148,13 +151,13 @@ class XboxControl(Node):
 
     # -------- Debug timer --------
     def _on_debug_timer(self):
-        # publish arrays/flags/cmd
         fa = Float32MultiArray()
         fa.data = [self._dbg_state['raw_lx'], self._dbg_state['raw_ry'], self._dbg_state['raw_rt']]
         self.pub_dbg_axes.publish(fa)
 
         fp = Float32MultiArray()
-        fp.data = [self._dbg_state['ls_h'], self._dbg_state['rs_v'], self._dbg_state['lin_gain'], self._dbg_state['ang_gain']]
+        fp.data = [self._dbg_state['ls_h'], self._dbg_state['rs_v'],
+                   self._dbg_state['lin_gain'], self._dbg_state['ang_gain']]
         self.pub_dbg_proc.publish(fp)
 
         fi = Int32MultiArray()
@@ -173,29 +176,24 @@ class XboxControl(Node):
         tw.angular.z = float(self._dbg_state['cmd_w'])
         self.pub_dbg_cmd.publish(tw)
 
-        # throttled log
         now = time.time()
         if now - self._last_log_t >= self.debug_log_th:
             self._last_log_t = now
             self.get_logger().info(
-                f"[DBG] raw(lx,ry,rt)=({self._dbg_state['raw_lx']:+.3f}, {self._dbg_state['raw_ry']:+.3f}, {self._dbg_state['raw_rt']:+.3f}) "
+                f"[DBG] raw(lx,ry,rt)=({self._dbg_state['raw_lx']:+.3f}, "
+                f"{self._dbg_state['raw_ry']:+.3f}, {self._dbg_state['raw_rt']:+.3f}) "
                 f"proc(ls_h,rs_v)=({self._dbg_state['ls_h']:+.3f}, {self._dbg_state['rs_v']:+.3f}) "
                 f"gain(L,A)=({self._dbg_state['lin_gain']:.3f}, {self._dbg_state['ang_gain']:.3f}) "
-                f"flags(RT,v,w,Y,A,LB)=({fi.data[0]}, {fi.data[1]}, {fi.data[2]}, {fi.data[3]}, {fi.data[4]}, {fi.data[5]}) "
                 f"cmd(v,w)=({self._dbg_state['cmd_v']:+.3f}, {self._dbg_state['cmd_w']:+.3f})"
             )
 
     # -------- Cmd timer --------
     def _on_cmd_timer(self):
-        # *** ถ้าอยู่ในโหมด Test ให้หยุดส่ง cmd_vel ***
         if self.is_test_mode:
-            return 
-        
-        # ส่งคำสั่งล่าสุดออกทุก ๆ รอบ แม้ไม่มี joy เข้ามา (Normal Mode)
+            return
         self.cmd_pub.publish(self._last_twist)
 
     # -------- Callback --------
-
     def joy_callback(self, msg: Joy):
         if self.prev_buttons is None:
             self.prev_buttons = list(msg.buttons)
@@ -210,39 +208,28 @@ class XboxControl(Node):
         btnX_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_X)
         btnY_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_Y)
 
-        # # ===== Tray commands: LT + (Y/A) =====
-        # if lt_pressed and btnY_edge:
-        #     self.tray_pub.publish(Int32(data=1))     # LT + Y → เปิด Tray (1)
-
-        # if lt_pressed and btnA_edge:
-        #     self.tray_pub.publish(Int32(data=-1))    # LT + A → ปิด Tray (-1)
-
-
         # ===== SPIN MODE commands: LT + (Y/A/X/B) =====
-        # LT + Y → spin_cmd = 1  (เข้า SPIN, หักล้อไป 45°)
         if lt_pressed and btnY_edge:
             self.spin_cmd_pub.publish(Int8(data=1))
-            self.get_logger().info('SPIN_CMD = 1 (enter / align to 45°)')
+            self.get_logger().info('SPIN_CMD = 1 (enter / align to 45° LEFT)')
 
-        # LT + A → spin_cmd = -1 (ยกเลิก SPIN, ล้อกลับ 0°)
         if lt_pressed and btnA_edge:
             self.spin_cmd_pub.publish(Int8(data=-1))
             self.get_logger().info('SPIN_CMD = -1 (cancel spin, back to normal)')
 
-        # LT + X → spin_cmd = 2  (เริ่มหมุนล้อขับหมุนตัว)
         if lt_pressed and btnX_edge:
             self.spin_cmd_pub.publish(Int8(data=2))
             self.get_logger().info('SPIN_CMD = 2 (start spinning drive wheels)')
 
-        # LT + B → spin_cmd = -2 (หยุดหมุนล้อขับ แต่ยังค้าง 45°)
         if lt_pressed and btnB_edge:
             self.spin_cmd_pub.publish(Int8(data=-2))
             self.get_logger().info('SPIN_CMD = -2 (stop drive spin, keep 45°)')
 
-        # ===== Trim adjust: LB + (Y/A/B/X) edge =====
+        # ===== Trim & RB / LB state =====
         lb_down = (0 <= self.BTN_LB < len(msg.buttons) and msg.buttons[self.BTN_LB] == 1)
         rb_down = (0 <= self.BTN_RB < len(msg.buttons) and msg.buttons[self.BTN_RB] == 1)
 
+        # ----- Trim adjust: LB + (Y/A/B/X) -----
         if lb_down:
             if btnY_edge:
                 self.linear_trim = self._clamp(self.linear_trim + self.trim_step,
@@ -261,19 +248,29 @@ class XboxControl(Node):
                                                 self.trim_angular_min, self.trim_angular_max)
                 self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
 
-        # ===== TEST MODE Control: RB + (B/X) =====
-        # RB + B = ENABLE Test Mode (1)
-        if rb_down and btnB_edge:
-            self.is_test_mode = True
-            self.test_mode_pub.publish(Int8(data=1))
-            self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
+        # ----- RB + ... : TEST MODE & RECORD/PLAY -----
+        if rb_down and not lt_pressed:
+            # RB + B = ENABLE Test Mode
+            if btnB_edge:
+                self.is_test_mode = True
+                self.test_mode_pub.publish(Int8(data=1))
+                self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
 
-        # RB + X = DISABLE Test Mode (0)
-        if rb_down and btnX_edge:
-            self.is_test_mode = False
-            self.test_mode_pub.publish(Int8(data=0))
-            self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
+            # RB + X = DISABLE Test Mode
+            if btnX_edge:
+                self.is_test_mode = False
+                self.test_mode_pub.publish(Int8(data=0))
+                self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
 
+            # RB + Y = REC_CMD 1 (toggle record start/stop)
+            if btnY_edge:
+                self.rec_cmd_pub.publish(Int8(data=1))
+                self.get_logger().info('REC_CMD = 1 (toggle record start/stop)')
+
+            # RB + A = REC_CMD 2 (play)
+            if btnA_edge:
+                self.rec_cmd_pub.publish(Int8(data=2))
+                self.get_logger().info('REC_CMD = 2 (play recorded path)')
 
         # ===== Driving (RT hold) =====
         raw_lx = self._axis(msg.axes, self.AX_LX, 0.0)
@@ -283,7 +280,6 @@ class XboxControl(Node):
 
         twist = Twist()
         if rt_pressed:
-            # RS↑ -> +linear.x ; LS← -> +angular.z
             rs_v = deadzone(raw_ry, self.dz)
             ls_h = -deadzone(raw_lx, self.dz)
 
@@ -315,10 +311,8 @@ class XboxControl(Node):
             twist.linear.x = 0.0
             twist.angular.z = 0.0
 
-        # เก็บไว้ให้ timer ส่งออกตามรอบ (ถ้าไม่ได้อยู่ใน test mode timer จะเอาค่านี้ไปส่ง)
         self._last_twist = twist
 
-        # keep debug state (for timer)
         if self.debug_enable:
             self._dbg_state.update({
                 'raw_lx': raw_lx, 'raw_ry': raw_ry, 'raw_rt': raw_rt,
@@ -332,7 +326,6 @@ class XboxControl(Node):
                 'cmd_v': v, 'cmd_w': w
             })
 
-        # update edge state
         self.prev_buttons = list(msg.buttons)
 
 
