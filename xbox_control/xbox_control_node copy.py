@@ -37,7 +37,6 @@ class XboxControl(Node):
         self.declare_parameter('BTN_X', 3)
         self.declare_parameter('BTN_Y', 4)
         self.declare_parameter('BTN_LB', 6)
-        self.declare_parameter('BTN_RB', 7) 
 
         # Trim (gain mode)
         self.declare_parameter('trim_step', 0.01)
@@ -69,7 +68,6 @@ class XboxControl(Node):
         self.BTN_X = int(gp('BTN_X').value)
         self.BTN_Y = int(gp('BTN_Y').value)
         self.BTN_LB = int(gp('BTN_LB').value)
-        self.BTN_RB = int(gp('BTN_RB').value)
 
         self.trim_step = float(gp('trim_step').value)
         self.trim_linear_min = float(gp('trim_linear_min').value)
@@ -87,12 +85,8 @@ class XboxControl(Node):
         # Publishers / Subscribers
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.tray_pub = self.create_publisher(Int32, '/tray_cmd', 10)
-
         # Publisher Test Mode
         self.test_mode_pub = self.create_publisher(Int8, '/test_mode', 10)
-
-        # Publisher Spin Mode
-        self.spin_cmd_pub = self.create_publisher(Int8, '/spin_cmd', 10)
         
         self.create_subscription(Joy, '/joy', self.joy_callback, 10)
 
@@ -210,38 +204,29 @@ class XboxControl(Node):
         btnX_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_X)
         btnY_edge = self._rose(self.prev_buttons, msg.buttons, self.BTN_Y)
 
-        # # ===== Tray commands: LT + (Y/A) =====
-        # if lt_pressed and btnY_edge:
-        #     self.tray_pub.publish(Int32(data=1))     # LT + Y → เปิด Tray (1)
-
-        # if lt_pressed and btnA_edge:
-        #     self.tray_pub.publish(Int32(data=-1))    # LT + A → ปิด Tray (-1)
-
-
-        # ===== SPIN MODE commands: LT + (Y/A/X/B) =====
-        # LT + Y → spin_cmd = 1  (เข้า SPIN, หักล้อไป 45°)
+        # ===== Tray commands: LT + (Y/A) =====
         if lt_pressed and btnY_edge:
-            self.spin_cmd_pub.publish(Int8(data=1))
-            self.get_logger().info('SPIN_CMD = 1 (enter / align to 45°)')
+            self.tray_pub.publish(Int32(data=1))     # LT + Y → เปิด Tray (1)
 
-        # LT + A → spin_cmd = -1 (ยกเลิก SPIN, ล้อกลับ 0°)
         if lt_pressed and btnA_edge:
-            self.spin_cmd_pub.publish(Int8(data=-1))
-            self.get_logger().info('SPIN_CMD = -1 (cancel spin, back to normal)')
+            self.tray_pub.publish(Int32(data=-1))    # LT + A → ปิด Tray (-1)
 
-        # LT + X → spin_cmd = 2  (เริ่มหมุนล้อขับหมุนตัว)
-        if lt_pressed and btnX_edge:
-            self.spin_cmd_pub.publish(Int8(data=2))
-            self.get_logger().info('SPIN_CMD = 2 (start spinning drive wheels)')
-
-        # LT + B → spin_cmd = -2 (หยุดหมุนล้อขับ แต่ยังค้าง 45°)
+        # ===== TEST MODE Control: LT + (B/X) =====
+        # LT + B = ENABLE Test Mode (1)
         if lt_pressed and btnB_edge:
-            self.spin_cmd_pub.publish(Int8(data=-2))
-            self.get_logger().info('SPIN_CMD = -2 (stop drive spin, keep 45°)')
+            self.is_test_mode = True
+            self.test_mode_pub.publish(Int8(data=1))
+            self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
+
+        # LT + X = DISABLE Test Mode (0)
+        if lt_pressed and btnX_edge:
+            self.is_test_mode = False
+            self.test_mode_pub.publish(Int8(data=0))
+            self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
+
 
         # ===== Trim adjust: LB + (Y/A/B/X) edge =====
         lb_down = (0 <= self.BTN_LB < len(msg.buttons) and msg.buttons[self.BTN_LB] == 1)
-        rb_down = (0 <= self.BTN_RB < len(msg.buttons) and msg.buttons[self.BTN_RB] == 1)
 
         if lb_down:
             if btnY_edge:
@@ -260,20 +245,6 @@ class XboxControl(Node):
                 self.angular_trim = self._clamp(self.angular_trim - self.trim_step,
                                                 self.trim_angular_min, self.trim_angular_max)
                 self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
-
-        # ===== TEST MODE Control: RB + (B/X) =====
-        # RB + B = ENABLE Test Mode (1)
-        if rb_down and btnB_edge:
-            self.is_test_mode = True
-            self.test_mode_pub.publish(Int8(data=1))
-            self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
-
-        # RB + X = DISABLE Test Mode (0)
-        if rb_down and btnX_edge:
-            self.is_test_mode = False
-            self.test_mode_pub.publish(Int8(data=0))
-            self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
-
 
         # ===== Driving (RT hold) =====
         raw_lx = self._axis(msg.axes, self.AX_LX, 0.0)
