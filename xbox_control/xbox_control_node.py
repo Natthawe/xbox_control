@@ -250,17 +250,17 @@ class XboxControl(Node):
 
         # ----- RB + ... : TEST MODE & RECORD/PLAY -----
         if rb_down and not lt_pressed:
-            # RB + B = ENABLE Test Mode
-            if btnB_edge:
-                self.is_test_mode = True
-                self.test_mode_pub.publish(Int8(data=1))
-                self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
+            # # RB + B = ENABLE Test Mode
+            # if btnB_edge:
+            #     self.is_test_mode = True
+            #     self.test_mode_pub.publish(Int8(data=1))
+            #     self.get_logger().info('>>> TEST MODE ENABLED (Joy cmd_vel BLOCKED) <<<')
 
-            # RB + X = DISABLE Test Mode
-            if btnX_edge:
-                self.is_test_mode = False
-                self.test_mode_pub.publish(Int8(data=0))
-                self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
+            # # RB + X = DISABLE Test Mode
+            # if btnX_edge:
+            #     self.is_test_mode = False
+            #     self.test_mode_pub.publish(Int8(data=0))
+            #     self.get_logger().info('<<< TEST MODE DISABLED (Joy cmd_vel RESUMED) >>>')
 
             # RB + Y = REC_CMD 1 (toggle record start/stop)
             if btnY_edge:
@@ -271,6 +271,12 @@ class XboxControl(Node):
             if btnA_edge:
                 self.rec_cmd_pub.publish(Int8(data=2))
                 self.get_logger().info('REC_CMD = 2 (play recorded path)')
+
+            # RB + B = REC_CMD 0 (stop play)
+            if btnB_edge:
+                self.rec_cmd_pub.publish(Int8(data=0))
+                self.get_logger().info('REC_CMD = 0 (STOP PLAY)')
+
 
         # ===== Driving (RT hold) =====
         raw_lx = self._axis(msg.axes, self.AX_LX, 0.0)
