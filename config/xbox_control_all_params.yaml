@@ -1,0 +1,88 @@
+xbox_input:
+  ros__parameters:
+    joy_topic: /joy
+    analog_topic: /xbox/analog
+    event_topic: /xbox/event
+
+    analog_publish_rate_hz: 60.0
+    event_throttle_sec: 0.01
+    lt_threshold: 0.5
+    rt_threshold: 0.5
+
+    # Axis mapping (Xbox Series controller via joy_node typical)
+    AX_LX: 0
+    AX_LY: 1
+    AX_RX: 2
+    AX_RY: 3
+    AX_RT: 4
+    AX_LT: 5
+    AX_DPAD_X: 6
+    AX_DPAD_Y: 7
+
+    stick_deadzone: 0.08
+    stick_dir_threshold: 0.35
+    dpad_dir_threshold: 0.5
+
+    stick_dir_mode: angle       # threshold | angle
+    dpad_dir_mode: threshold    # threshold | angle
+
+    # Inverts: ปรับให้ "UP เป็น +", "RIGHT เป็น +"
+    invert_ly: false            # ดันขึ้นให้เป็น UP
+    invert_ry: true            # ดันขึ้นให้เป็น UP
+    invert_lx: true             # ดันขวาให้เป็น RIGHT
+    invert_rx: true             # ดันขวาให้เป็น RIGHT
+    invert_dpad_x: true         # กดขวาให้เป็น RIGHT
+    invert_dpad_y: false        # กดขึ้นให้เป็น UP
+
+    # Button mapping
+    BTN_A: 0
+    BTN_B: 1
+    BTN_X: 3
+    BTN_Y: 4
+    BTN_LB: 6
+    BTN_RB: 7
+    BTN_VIEW: 10
+    BTN_MENU: 11
+    BTN_LS: 13
+    BTN_RS: 14
+    BTN_SHARE: 15
+
+
+xbox_cmdvel:
+  ros__parameters:
+    analog_topic: /xbox/analog
+    event_topic: /xbox/event
+    cmd_vel_topic: /cmd_vel
+
+    cmd_vel_publish_rate_hz: 20.0
+    joy_timeout_sec: 0.5
+
+    # analog array indices: [lx, ly, rx, ry, lt, rt, dpad_x, dpad_y]
+    IDX_LX: 0
+    IDX_LY: 1
+    IDX_RX: 2
+    IDX_RY: 3
+    IDX_LT: 4
+    IDX_RT: 5
+
+    # drive mapping
+    drive_v_axis: RY     # use RightStick Y for linear
+    drive_w_axis: LX     # use LeftStick X for angular
+
+    # RT gate
+    rt_threshold: 0.5
+    require_rt_hold: true
+
+    scale_linear: 0.5
+    scale_angular: 1.0
+    invert_linear: true
+    invert_angular: true
+
+    axis_active_threshold: 0.02
+
+    # Trim (LB + Y/A/B/X)
+    trim_step: 0.01
+    trim_linear_min: -1.0
+    trim_linear_max: 1.0
+    trim_angular_min: -2.0
+    trim_angular_max: 2.0

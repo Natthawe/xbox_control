@@ -25,7 +25,9 @@ setup(
     entry_points={
         'console_scripts': [
             'xbox_control_node = xbox_control.xbox_control_node:main',
-            'xbox_control_debug = xbox_control.xbox_control_debug_node:main'
+            'xbox_control_debug = xbox_control.xbox_control_debug_node:main',
+            'xbox_input = xbox_control.xbox_input:main',
+            'xbox_cmdvel = xbox_control.xbox_cmdvel:main',
         ],
     },
 )
