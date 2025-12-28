@@ -1,0 +1,55 @@
+xbox_control_debug:
+  ros__parameters:
+
+    # =========================
+    # Debug output
+    # =========================
+    debug_topic: /xbox_control/debug/axis_and_buttons
+    throttle_sec: 0.01          # หน่วงเวลาขั้นต่ำระหว่าง event
+
+    # =========================
+    # Axis mapping (Joy.axes)
+    # =========================
+    AX_LX: 0                    # Left stick horizontal
+    AX_LY: 1                    # Left stick vertical
+    AX_RX: 2                    # Right stick horizontal
+    AX_RY: 3                    # Right stick vertical
+    AX_RT: 4                    # RT trigger (axis)
+    AX_LT: 5                    # LT trigger (axis)
+    AX_DPAD_X: 6                # D-pad left/right
+    AX_DPAD_Y: 7                # D-pad up/down
+
+    # =========================
+    # Trigger thresholds
+    # =========================
+    lt_threshold: 0.5           # ค่าต่ำกว่านี้ = LT pressed
+    rt_threshold: 0.5           # ค่าต่ำกว่านี้ = RT pressed
+
+    # =========================
+    # Stick direction detection
+    # =========================
+    stick_deadzone: 0.08        # ตัด noise ใกล้ศูนย์
+    stick_dir_threshold: 0.35   # เกินค่านี้ถึงจะนับว่าเป็นทิศ
+    invert_ly: false            # ดันขึ้นให้เป็น UP
+    invert_ry: false            # ดันขึ้นให้เป็น UP
+    invert_lx: true             # ดันขวาให้เป็น RIGHT
+    invert_rx: true             # ดันขวาให้เป็น RIGHT
+    invert_dpad_x: true         # กดขวาให้เป็น RIGHT
+    invert_dpad_y: false        # กดขึ้นให้เป็น UP
+
+    # =========================
+    # Button mapping (Joy.buttons)
+    # =========================
+    BTN_A: 0                    # A
+    BTN_B: 1                    # B
+    BTN_X: 3                    # X
+    BTN_Y: 4                    # Y
+
+    BTN_LB: 6                   # LB
+    BTN_RB: 7                   # RB
+
+    BTN_VIEW: 10                # View / Back
+    BTN_MENU: 11                # Menu / Start
+    BTN_LS: 13                  # Left stick click
+    BTN_RS: 14                  # Right stick click
+    BTN_SHARE: 15               # Share

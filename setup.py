@@ -21,10 +21,11 @@ setup(
     maintainer_email='natthawejumjai@gmail.com',
     description='xbox controller for robot',
     license='Apache-2.0',
-    tests_require=['pytest'],
+    # tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'xbox_control_node = xbox_control.xbox_control_node:main',
+            'xbox_control_debug = xbox_control.xbox_control_debug_node:main'
         ],
     },
 )
