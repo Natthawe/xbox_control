@@ -36,18 +36,9 @@ class XboxControlDebug(Node):
         self.declare_parameter('lt_threshold', 0.5)
         self.declare_parameter('rt_threshold', 0.5)
 
-        # Stick direction thresholds
+        # Stick direction
         self.declare_parameter('stick_deadzone', 0.08)
         self.declare_parameter('stick_dir_threshold', 0.35)
-
-        # D-pad threshold (normally not needed, but for angle mode / noise)
-        self.declare_parameter('dpad_dir_threshold', 0.5)
-
-        # Direction mode selection
-        # - "threshold": use x/y threshold logic
-        # - "angle": use atan2 and quantize to 8 directions
-        self.declare_parameter('stick_dir_mode', 'threshold')
-        self.declare_parameter('dpad_dir_mode', 'threshold')
 
         # Invert options
         self.declare_parameter('invert_lx', False)
@@ -72,49 +63,41 @@ class XboxControlDebug(Node):
 
         gp = self.get_parameter
         self.topic = gp('debug_topic').value
-        self.throttle_sec = float(gp('throttle_sec').value)
+        self.throttle_sec = gp('throttle_sec').value
 
-        self.AX_LX = int(gp('AX_LX').value)
-        self.AX_LY = int(gp('AX_LY').value)
-        self.AX_RX = int(gp('AX_RX').value)
-        self.AX_RY = int(gp('AX_RY').value)
-        self.AX_RT = int(gp('AX_RT').value)
-        self.AX_LT = int(gp('AX_LT').value)
-        self.AX_DPAD_X = int(gp('AX_DPAD_X').value)
-        self.AX_DPAD_Y = int(gp('AX_DPAD_Y').value)
+        self.AX_LX = gp('AX_LX').value
+        self.AX_LY = gp('AX_LY').value
+        self.AX_RX = gp('AX_RX').value
+        self.AX_RY = gp('AX_RY').value
+        self.AX_RT = gp('AX_RT').value
+        self.AX_LT = gp('AX_LT').value
+        self.AX_DPAD_X = gp('AX_DPAD_X').value
+        self.AX_DPAD_Y = gp('AX_DPAD_Y').value
 
-        self.lt_threshold = float(gp('lt_threshold').value)
-        self.rt_threshold = float(gp('rt_threshold').value)
+        self.lt_threshold = gp('lt_threshold').value
+        self.rt_threshold = gp('rt_threshold').value
 
-        self.stick_dz = float(gp('stick_deadzone').value)
-        self.stick_dir_th = float(gp('stick_dir_threshold').value)
-        self.dpad_dir_th = float(gp('dpad_dir_threshold').value)
+        self.stick_dz = gp('stick_deadzone').value
+        self.stick_dir_th = gp('stick_dir_threshold').value
 
-        self.stick_dir_mode = str(gp('stick_dir_mode').value).strip().lower()
-        self.dpad_dir_mode = str(gp('dpad_dir_mode').value).strip().lower()
-        if self.stick_dir_mode not in ('threshold', 'angle'):
-            self.stick_dir_mode = 'threshold'
-        if self.dpad_dir_mode not in ('threshold', 'angle'):
-            self.dpad_dir_mode = 'threshold'
+        self.invert_lx = gp('invert_lx').value
+        self.invert_ly = gp('invert_ly').value
+        self.invert_rx = gp('invert_rx').value
+        self.invert_ry = gp('invert_ry').value
+        self.invert_dpad_x = gp('invert_dpad_x').value
+        self.invert_dpad_y = gp('invert_dpad_y').value
 
-        self.invert_lx = bool(gp('invert_lx').value)
-        self.invert_ly = bool(gp('invert_ly').value)
-        self.invert_rx = bool(gp('invert_rx').value)
-        self.invert_ry = bool(gp('invert_ry').value)
-        self.invert_dpad_x = bool(gp('invert_dpad_x').value)
-        self.invert_dpad_y = bool(gp('invert_dpad_y').value)
-
-        self.BTN_A = int(gp('BTN_A').value)
-        self.BTN_B = int(gp('BTN_B').value)
-        self.BTN_X = int(gp('BTN_X').value)
-        self.BTN_Y = int(gp('BTN_Y').value)
-        self.BTN_LB = int(gp('BTN_LB').value)
-        self.BTN_RB = int(gp('BTN_RB').value)
-        self.BTN_VIEW = int(gp('BTN_VIEW').value)
-        self.BTN_MENU = int(gp('BTN_MENU').value)
-        self.BTN_LS = int(gp('BTN_LS').value)
-        self.BTN_RS = int(gp('BTN_RS').value)
-        self.BTN_SHARE = int(gp('BTN_SHARE').value)
+        self.BTN_A = gp('BTN_A').value
+        self.BTN_B = gp('BTN_B').value
+        self.BTN_X = gp('BTN_X').value
+        self.BTN_Y = gp('BTN_Y').value
+        self.BTN_LB = gp('BTN_LB').value
+        self.BTN_RB = gp('BTN_RB').value
+        self.BTN_VIEW = gp('BTN_VIEW').value
+        self.BTN_MENU = gp('BTN_MENU').value
+        self.BTN_LS = gp('BTN_LS').value
+        self.BTN_RS = gp('BTN_RS').value
+        self.BTN_SHARE = gp('BTN_SHARE').value
 
         self.pub = self.create_publisher(String, self.topic, 10)
         self.create_subscription(Joy, '/joy', self.cb, 10)
@@ -124,14 +107,12 @@ class XboxControlDebug(Node):
 
         self._prev_lt_pressed = False
         self._prev_rt_pressed = False
-
-        self._prev_dpad_dir = "CENTER"
+        self._prev_dpad_x = 0
+        self._prev_dpad_y = 0
         self._prev_ls_dir = "CENTER"
         self._prev_rs_dir = "CENTER"
 
-        self.get_logger().info(
-            f'🎮 xbox_control_debug -> {self.topic} | stick_mode={self.stick_dir_mode} dpad_mode={self.dpad_dir_mode}'
-        )
+        self.get_logger().info(f'🎮 xbox_control_debug started -> {self.topic}')
 
     # ---------- helpers ----------
     def _axis(self, axes, idx, default=0.0):
@@ -150,64 +131,12 @@ class XboxControlDebug(Node):
         self._last_emit_t = now
         self.pub.publish(String(data=text))
 
-    def _dir8_threshold(self, x: float, y: float, th: float):
-        ax = abs(x)
-        ay = abs(y)
-        if ax < th and ay < th:
+    def _dir4(self, x: float, y: float):
+        if abs(x) < self.stick_dir_th and abs(y) < self.stick_dir_th:
             return "CENTER"
-
-        x_on = ax >= th
-        y_on = ay >= th
-
-        if x_on and y_on:
-            if y > 0 and x > 0: return "UP_RIGHT"
-            if y > 0 and x < 0: return "UP_LEFT"
-            if y < 0 and x > 0: return "DOWN_RIGHT"
-            return "DOWN_LEFT"
-
-        if y_on:
-            return "UP" if y > 0 else "DOWN"
-        return "RIGHT" if x > 0 else "LEFT"
-
-    def _dir8_angle(self, x: float, y: float, th: float):
-        # magnitude gate (เหมือน threshold แต่ตัดสินทิศด้วยมุม)
-        if abs(x) < th and abs(y) < th:
-            return "CENTER"
-
-        ang = math.degrees(math.atan2(y, x))  # [-180..180], 0=RIGHT, 90=UP
-
-        # quantize to nearest 45 degrees sector
-        # sectors centered at: 0,45,90,135,180,-135,-90,-45
-        # We'll map using ranges:
-        # [-22.5..22.5] RIGHT
-        # [22.5..67.5] UP_RIGHT
-        # [67.5..112.5] UP
-        # [112.5..157.5] UP_LEFT
-        # [>=157.5 or <=-157.5] LEFT
-        # [-157.5..-112.5] DOWN_LEFT
-        # [-112.5..-67.5] DOWN
-        # [-67.5..-22.5] DOWN_RIGHT
-
-        if -22.5 <= ang < 22.5:
-            return "RIGHT"
-        if 22.5 <= ang < 67.5:
-            return "UP_RIGHT"
-        if 67.5 <= ang < 112.5:
-            return "UP"
-        if 112.5 <= ang < 157.5:
-            return "UP_LEFT"
-        if ang >= 157.5 or ang < -157.5:
-            return "LEFT"
-        if -157.5 <= ang < -112.5:
-            return "DOWN_LEFT"
-        if -112.5 <= ang < -67.5:
-            return "DOWN"
-        return "DOWN_RIGHT"  # [-67.5..-22.5)
-
-    def _dir8(self, x: float, y: float, th: float, mode: str):
-        if mode == 'angle':
-            return self._dir8_angle(x, y, th)
-        return self._dir8_threshold(x, y, th)
+        return "UP" if abs(y) >= abs(x) and y > 0 else \
+               "DOWN" if abs(y) >= abs(x) else \
+               "RIGHT" if x > 0 else "LEFT"
 
     # ---------- callback ----------
     def cb(self, msg: Joy):
@@ -228,20 +157,24 @@ class XboxControlDebug(Node):
             self._emit("RT" if rt_pressed else "RT_RELEASE")
             self._prev_rt_pressed = rt_pressed
 
-        # ===== D-pad (8-dir, threshold|angle) =====
-        # D-pad usually -1/0/1; round it first
-        dpad_x = float(int(round(self._axis(msg.axes, self.AX_DPAD_X, 0.0))))
-        dpad_y = float(int(round(self._axis(msg.axes, self.AX_DPAD_Y, 0.0))))
+        # ===== D-pad =====
+        dpad_x = int(round(self._axis(msg.axes, self.AX_DPAD_X, 0.0)))
+        dpad_y = int(round(self._axis(msg.axes, self.AX_DPAD_Y, 0.0)))
 
         if self.invert_dpad_x:
             dpad_x = -dpad_x
         if self.invert_dpad_y:
             dpad_y = -dpad_y
 
-        dpad_dir = self._dir8(dpad_x, dpad_y, self.dpad_dir_th, self.dpad_dir_mode)
-        if dpad_dir != self._prev_dpad_dir:
-            self._emit("DPAD_RELEASE" if dpad_dir == "CENTER" else f"DPAD_{dpad_dir}")
-            self._prev_dpad_dir = dpad_dir
+        if dpad_x != self._prev_dpad_x or dpad_y != self._prev_dpad_y:
+            if dpad_x == 1: self._emit("DPAD_RIGHT")
+            if dpad_x == -1: self._emit("DPAD_LEFT")
+            if dpad_y == 1: self._emit("DPAD_UP")
+            if dpad_y == -1: self._emit("DPAD_DOWN")
+            if dpad_x == 0 and dpad_y == 0:
+                self._emit("DPAD_RELEASE")
+            self._prev_dpad_x = dpad_x
+            self._prev_dpad_y = dpad_y
 
         # ===== Buttons =====
         for name, idx in [
@@ -254,7 +187,7 @@ class XboxControlDebug(Node):
             if self._rose(self.prev_buttons, msg.buttons, idx):
                 self._emit(name)
 
-        # ===== Stick directions (8-dir, threshold|angle) =====
+        # ===== Stick directions =====
         lx = deadzone(self._axis(msg.axes, self.AX_LX, 0.0), self.stick_dz)
         ly = deadzone(self._axis(msg.axes, self.AX_LY, 0.0), self.stick_dz)
         rx = deadzone(self._axis(msg.axes, self.AX_RX, 0.0), self.stick_dz)
@@ -265,8 +198,8 @@ class XboxControlDebug(Node):
         if self.invert_rx: rx = -rx
         if self.invert_ry: ry = -ry
 
-        ls_dir = self._dir8(lx, ly, self.stick_dir_th, self.stick_dir_mode)
-        rs_dir = self._dir8(rx, ry, self.stick_dir_th, self.stick_dir_mode)
+        ls_dir = self._dir4(lx, ly)
+        rs_dir = self._dir4(rx, ry)
 
         if ls_dir != self._prev_ls_dir:
             self._emit("LS_RELEASE" if ls_dir == "CENTER" else f"LS_{ls_dir}")

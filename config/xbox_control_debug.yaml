@@ -26,6 +26,12 @@ xbox_control_debug:
     rt_threshold: 0.5           # ค่าต่ำกว่านี้ = RT pressed
 
     # =========================
+    # Direction mode
+    # =========================
+    stick_dir_mode: angle       # threshold | angle
+    dpad_dir_mode: threshold    # threshold | angle
+
+    # =========================
     # Stick direction detection
     # =========================
     stick_deadzone: 0.08        # ตัด noise ใกล้ศูนย์
