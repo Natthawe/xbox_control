@@ -3,6 +3,7 @@ xbox_input:
     joy_topic: /joy
     analog_topic: /xbox/analog
     event_topic: /xbox/event
+    analog_raw_topic: /xbox/analog_raw
 
     analog_publish_rate_hz: 60.0
     event_throttle_sec: 0.01
@@ -28,11 +29,15 @@ xbox_input:
 
     # Inverts: ปรับให้ "UP เป็น +", "RIGHT เป็น +"
     invert_ly: false            # ดันขึ้นให้เป็น UP
-    invert_ry: true            # ดันขึ้นให้เป็น UP
-    invert_lx: true             # ดันขวาให้เป็น RIGHT
-    invert_rx: true             # ดันขวาให้เป็น RIGHT
-    invert_dpad_x: true         # กดขวาให้เป็น RIGHT
+    invert_ry: false            # ดันขึ้นให้เป็น UP
+    invert_lx: false            # ดันขวาให้เป็น RIGHT
+    invert_rx: false            # ดันขวาให้เป็น RIGHT
+    invert_dpad_x: false        # กดขวาให้เป็น RIGHT
     invert_dpad_y: false        # กดขึ้นให้เป็น UP
+
+    event_swap_lr: true         # สลับ LEFT/RIGHT เฉพาะ event
+    event_swap_ud: false        # สลับ UP/DOWN เฉพาะ event
+
 
     # Button mapping
     BTN_A: 0
@@ -75,14 +80,14 @@ xbox_cmdvel:
 
     scale_linear: 0.5
     scale_angular: 1.0
-    invert_linear: true
-    invert_angular: true
+    invert_linear: false
+    invert_angular: false
 
     axis_active_threshold: 0.02
 
     # Trim (LB + Y/A/B/X)
-    trim_step: 0.01
+    trim_step: 0.02
     trim_linear_min: -1.0
     trim_linear_max: 1.0
-    trim_angular_min: -2.0
-    trim_angular_max: 2.0
+    trim_angular_min: -1.0
+    trim_angular_max: 1.0

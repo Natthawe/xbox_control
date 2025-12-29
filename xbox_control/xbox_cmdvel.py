@@ -83,6 +83,44 @@ class XboxCmdVel(Node):
         self.trim_angular_min = float(gp('trim_angular_min').value)
         self.trim_angular_max = float(gp('trim_angular_max').value)
 
+        self.get_logger().info("===== xbox_cmdvel parameters loaded =====")
+        self.get_logger().info(f"analog_topic         = {self.analog_topic}")
+        self.get_logger().info(f"event_topic          = {self.event_topic}")
+        self.get_logger().info(f"cmd_vel_topic        = {self.cmd_vel_topic}")
+        self.get_logger().info(f"publish_rate         = {self.pub_hz} Hz")
+        self.get_logger().info(f"joy_timeout_sec      = {self.timeout_sec}")
+
+        self.get_logger().info(
+            f"analog IDX: LX={self.IDX['LX']} LY={self.IDX['LY']} "
+            f"RX={self.IDX['RX']} RY={self.IDX['RY']} "
+            f"LT={self.IDX['LT']} RT={self.IDX['RT']}"
+        )
+
+        self.get_logger().info(
+            f"drive mapping: v_axis={self.drive_v_axis} w_axis={self.drive_w_axis}"
+        )
+
+        self.get_logger().info(
+            f"RT gate: threshold={self.rt_threshold} require_rt_hold={self.require_rt_hold}"
+        )
+
+        self.get_logger().info(
+            f"scale: linear={self.scale_linear} angular={self.scale_angular} "
+            f"invert_linear={self.invert_linear} invert_angular={self.invert_angular}"
+        )
+
+        self.get_logger().info(
+            f"axis_active_threshold={self.axis_active_th}"
+        )
+
+        self.get_logger().info(
+            f"trim: step={self.trim_step} "
+            f"lin[{self.trim_linear_min},{self.trim_linear_max}] "
+            f"ang[{self.trim_angular_min},{self.trim_angular_max}]"
+        )
+        self.get_logger().info("========================================")
+
+
         # Pub/Sub
         self.cmd_pub = self.create_publisher(Twist, self.cmd_vel_topic, 10)
         self.create_subscription(Float32MultiArray, self.analog_topic, self.cb_analog, 10)
@@ -130,20 +168,23 @@ class XboxCmdVel(Node):
 
         if self._lb_down and ev == "Y":
             self.linear_trim = self._clamp(self.linear_trim + self.trim_step,
-                                           self.trim_linear_min, self.trim_linear_max)
-            self.get_logger().info(f'🔧 linear_trim = {self.linear_trim:+.3f}')
+                                        self.trim_linear_min, self.trim_linear_max)
+            self.get_logger().info(f"[trim] LB+Y step=+{self.trim_step:.3f} -> {self._status_line()}")
+
         elif self._lb_down and ev == "A":
             self.linear_trim = self._clamp(self.linear_trim - self.trim_step,
-                                           self.trim_linear_min, self.trim_linear_max)
-            self.get_logger().info(f'🔧 linear_trim = {self.linear_trim:+.3f}')
+                                        self.trim_linear_min, self.trim_linear_max)
+            self.get_logger().info(f"[trim] LB+A step=-{self.trim_step:.3f} -> {self._status_line()}")
+
         elif self._lb_down and ev == "B":
             self.angular_trim = self._clamp(self.angular_trim + self.trim_step,
                                             self.trim_angular_min, self.trim_angular_max)
-            self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
+            self.get_logger().info(f"[trim] LB+B step=+{self.trim_step:.3f} -> {self._status_line()}")
+
         elif self._lb_down and ev == "X":
             self.angular_trim = self._clamp(self.angular_trim - self.trim_step,
                                             self.trim_angular_min, self.trim_angular_max)
-            self.get_logger().info(f'🔧 angular_trim = {self.angular_trim:+.3f}')
+            self.get_logger().info(f"[trim] LB+X step=-{self.trim_step:.3f} -> {self._status_line()}")
 
         self._last_cmd = self._compute_cmd()
 
@@ -162,7 +203,7 @@ class XboxCmdVel(Node):
             w = 0.0
 
         rt_val = float(a[self.IDX['RT']])
-        rt_pressed = (rt_val < self.rt_threshold)  # ✅ matches your trigger scale 1..-1
+        rt_pressed = (rt_val < self.rt_threshold)  # scale 1..-1
 
         if self.require_rt_hold and (not rt_pressed):
             v = 0.0
@@ -183,6 +224,19 @@ class XboxCmdVel(Node):
         t.linear.x = float(v)
         t.angular.z = float(w)
         return t
+
+    def _fmt(self, x: float) -> str:
+        return f"{x:+.3f}"
+
+    def _status_line(self) -> str:
+
+        lin_gain = max(0.0, self.scale_linear + self.linear_trim)
+        ang_gain = max(0.0, self.scale_angular + self.angular_trim)
+
+        return (
+            f"trim lin={self._fmt(self.linear_trim)} ang={self._fmt(self.angular_trim)} | "
+            f"gain lin={self._fmt(lin_gain)} ang={self._fmt(ang_gain)} "
+        )
 
     def _on_timer(self):
         now = time.time()

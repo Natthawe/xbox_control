@@ -27,6 +27,7 @@ class XboxInput(Node):
         self.declare_parameter('joy_topic', '/joy')
         self.declare_parameter('analog_topic', '/xbox/analog')
         self.declare_parameter('event_topic', '/xbox/event')
+        self.declare_parameter('analog_raw_topic', '/xbox/analog_raw')
         self.declare_parameter('analog_publish_rate_hz', 50.0)  # publish analog at fixed rate
         self.declare_parameter('event_throttle_sec', 0.01)       # minimal gap between event publishes
 
@@ -61,6 +62,10 @@ class XboxInput(Node):
         self.declare_parameter('invert_dpad_x', False)
         self.declare_parameter('invert_dpad_y', False)
 
+        # ===== SWAP Event options =====
+        self.declare_parameter('event_swap_lr', False)   # สลับ LEFT/RIGHT เฉพาะ event
+        self.declare_parameter('event_swap_ud', False)   # สลับ UP/DOWN เฉพาะ event
+
         # ===== Button indices =====
         self.declare_parameter('BTN_A', 0)
         self.declare_parameter('BTN_B', 1)
@@ -79,6 +84,7 @@ class XboxInput(Node):
         self.joy_topic = str(gp('joy_topic').value)
         self.analog_topic = str(gp('analog_topic').value)
         self.event_topic = str(gp('event_topic').value)
+        self.analog_raw_topic = str(gp('analog_raw_topic').value)
         self.analog_hz = float(gp('analog_publish_rate_hz').value)
         self.event_throttle = float(gp('event_throttle_sec').value)
 
@@ -111,6 +117,8 @@ class XboxInput(Node):
         self.inv_ry = bool(gp('invert_ry').value)
         self.inv_dx = bool(gp('invert_dpad_x').value)
         self.inv_dy = bool(gp('invert_dpad_y').value)
+        self.event_swap_lr = bool(gp('event_swap_lr').value)
+        self.event_swap_ud = bool(gp('event_swap_ud').value)
 
         self.BTN_A = int(gp('BTN_A').value)
         self.BTN_B = int(gp('BTN_B').value)
@@ -124,10 +132,46 @@ class XboxInput(Node):
         self.BTN_RS = int(gp('BTN_RS').value)
         self.BTN_SHARE = int(gp('BTN_SHARE').value)
 
+        self.get_logger().info("===== xbox_input parameters loaded =====")
+        self.get_logger().info(f"joy_topic            = {self.joy_topic}")
+        self.get_logger().info(f"analog_topic         = {self.analog_topic}")
+        self.get_logger().info(f"event_topic          = {self.event_topic}")
+        self.get_logger().info(f"analog_raw_topic     = {self.analog_raw_topic}")
+        self.get_logger().info(f"analog_publish_rate  = {self.analog_hz} Hz")
+        self.get_logger().info(f"event_throttle_sec   = {self.event_throttle}")
+
+        self.get_logger().info(
+            f"axes: LX={self.AX_LX} LY={self.AX_LY} RX={self.AX_RX} RY={self.AX_RY} "
+            f"LT={self.AX_LT} RT={self.AX_RT} DPX={self.AX_DPAD_X} DPY={self.AX_DPAD_Y}"
+        )
+
+        self.get_logger().info(
+            f"deadzone={self.stick_dz} stick_th={self.stick_dir_th} dpad_th={self.dpad_dir_th}"
+        )
+
+        self.get_logger().info(
+            f"stick_mode={self.stick_dir_mode} dpad_mode={self.dpad_dir_mode}"
+        )
+
+        self.get_logger().info(
+            f"invert: lx={self.inv_lx} ly={self.inv_ly} "
+            f"rx={self.inv_rx} ry={self.inv_ry} "
+            f"dpad_x={self.inv_dx} dpad_y={self.inv_dy} "
+            f"event_swap_lr={self.event_swap_lr} event_swap_ud={self.event_swap_ud} "
+        )
+
+        self.get_logger().info(
+            f"buttons: A={self.BTN_A} B={self.BTN_B} X={self.BTN_X} Y={self.BTN_Y} "
+            f"LB={self.BTN_LB} RB={self.BTN_RB}"
+        )
+        self.get_logger().info("========================================")
+
+
         # Pub/Sub
         self.pub_analog = self.create_publisher(Float32MultiArray, self.analog_topic, 10)
         self.pub_event = self.create_publisher(String, self.event_topic, 10)
         self.create_subscription(Joy, self.joy_topic, self.cb_joy, 10)
+        self.pub_analog_raw = self.create_publisher(Float32MultiArray, self.analog_raw_topic, 10)
 
         # State
         self.prev_buttons = None
@@ -229,6 +273,21 @@ class XboxInput(Node):
         if self.prev_buttons is None:
             self.prev_buttons = list(msg.buttons)
 
+        # --- RAW passthrough (must match /joy 1:1) ---
+        raw_lx = self._axis(msg.axes, self.AX_LX, 0.0)
+        raw_ly = self._axis(msg.axes, self.AX_LY, 0.0)
+        raw_rx = self._axis(msg.axes, self.AX_RX, 0.0)
+        raw_ry = self._axis(msg.axes, self.AX_RY, 0.0)
+        raw_lt = self._axis(msg.axes, self.AX_LT, 1.0)
+        raw_rt = self._axis(msg.axes, self.AX_RT, 1.0)
+        raw_dpad_x = self._axis(msg.axes, self.AX_DPAD_X, 0.0)
+        raw_dpad_y = self._axis(msg.axes, self.AX_DPAD_Y, 0.0)
+
+        raw_msg = Float32MultiArray()
+        raw_msg.data = [raw_lx, raw_ly, raw_rx, raw_ry, raw_lt, raw_rt, raw_dpad_x, raw_dpad_y]
+        self.pub_analog_raw.publish(raw_msg)
+
+
         # --- read axes ---
         lx = deadzone(self._axis(msg.axes, self.AX_LX, 0.0), self.stick_dz)
         ly = deadzone(self._axis(msg.axes, self.AX_LY, 0.0), self.stick_dz)
@@ -265,9 +324,32 @@ class XboxInput(Node):
             self._emit_event("RT" if rt_pressed else "RT_RELEASE")
             self._prev_rt_pressed = rt_pressed
 
+
+        # ===== event-only axis copy (DO NOT affect analog) =====
+        lx_ev, ly_ev = lx, ly
+        rx_ev, ry_ev = rx, ry
+        dx_ev, dy_ev = dpad_x, dpad_y
+
+        if self.event_swap_lr:
+            lx_ev = -lx_ev
+            rx_ev = -rx_ev
+            dx_ev = -dx_ev
+
+        if self.event_swap_ud:
+            ly_ev = -ly_ev
+            ry_ev = -ry_ev
+            dy_ev = -dy_ev
+
         # --- stick direction events (8-dir) ---
-        ls_dir = self._dir8(lx, ly, self.stick_dir_th, self.stick_dir_mode)
-        rs_dir = self._dir8(rx, ry, self.stick_dir_th, self.stick_dir_mode)
+        ls_dir = self._dir8(lx_ev, ly_ev, self.stick_dir_th, self.stick_dir_mode)
+        rs_dir = self._dir8(rx_ev, ry_ev, self.stick_dir_th, self.stick_dir_mode)
+
+        # --- dpad direction events (8-dir) ---
+        dpad_dir = self._dir8(dx_ev, dy_ev, self.dpad_dir_th, self.dpad_dir_mode)
+
+        # # --- stick direction events (8-dir) ---
+        # ls_dir = self._dir8(lx, ly, self.stick_dir_th, self.stick_dir_mode)
+        # rs_dir = self._dir8(rx, ry, self.stick_dir_th, self.stick_dir_mode)
 
         if ls_dir != self._prev_ls_dir:
             self._emit_event("LS_RELEASE" if ls_dir == "CENTER" else f"LS_{ls_dir}")
@@ -277,8 +359,8 @@ class XboxInput(Node):
             self._emit_event("RS_RELEASE" if rs_dir == "CENTER" else f"RS_{rs_dir}")
             self._prev_rs_dir = rs_dir
 
-        # --- dpad direction events (8-dir) ---
-        dpad_dir = self._dir8(dpad_x, dpad_y, self.dpad_dir_th, self.dpad_dir_mode)
+        # # --- dpad direction events (8-dir) ---
+        # dpad_dir = self._dir8(dpad_x, dpad_y, self.dpad_dir_th, self.dpad_dir_mode)
         if dpad_dir != self._prev_dpad_dir:
             self._emit_event("DPAD_RELEASE" if dpad_dir == "CENTER" else f"DPAD_{dpad_dir}")
             self._prev_dpad_dir = dpad_dir
